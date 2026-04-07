@@ -6,12 +6,36 @@ __pycache__/
 venv/
 env/
 
-# Zephyr / west workspace at the repo root is the developer's local build
-# area — external code, working configs, build artifacts. Never committed.
-# (The committed firmware sources live under prototype/firmware/ for the
-# prototype, and will live at the repo root in their own structure for
-# Device 1.0 once the new layout lands.)
-/firmware/
+# West workspace external code and build artifacts.
+#
+# The developer's local west workspace is initialized with `west init -l
+# firmware/config`, which lays out zephyr/, zmk/, modules/, and the
+# individual-project checkouts inside firmware/. None of those directories
+# are ours — they're pulled from upstream on `west update` — so they must
+# never be committed. Same for the build output and the .venv.
+#
+# What IS ours under firmware/ is committed explicitly:
+#   firmware/README.md
+#   firmware/module/       ← out-of-tree Zephyr module (midigloves)
+#   firmware/config/       ← Glove80 build config (keymap, .conf, west.yml)
+#   firmware/zmk-fork-patches/
+#   firmware/samples/      ← Zephyr sample apps
+
+/firmware/zephyr/
+/firmware/zmk/
+/firmware/modules/
+/firmware/cirque-input-module/
+/firmware/.west/
+/firmware/.venv/
+/firmware/build/
+/firmware/build_*/
+/firmware/FLASH_GUIDE.md
+
+# Milestone 0 only — the keymap and .conf land in Milestone 1 when the
+# prototype sources are ported into the new module's include paths.
+/firmware/config/glove80.keymap
+/firmware/config/glove80.conf
+
 build/
 
 # Claude Code session state (per-developer, not project content)

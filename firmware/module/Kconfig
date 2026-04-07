@@ -1,0 +1,33 @@
+# midigloves — Kconfig
+#
+# Top-level symbol gates the whole module. Sub-symbols enable optional
+# transports and features as subsequent milestones land.
+
+menuconfig MIDIGLOVES
+    bool "midigloves: Glove80 MIDI instrument"
+    help
+      Enable the midigloves out-of-tree Zephyr module, which turns the
+      Glove80 into a chromatic MIDI instrument with per-key RGB feedback
+      that mirrors the active musical scale.
+
+      See https://github.com/Onnson/midigloves for the full design.
+
+if MIDIGLOVES
+
+config MIDIGLOVES_USB
+    bool "USB-MIDI transport"
+    default y
+    help
+      Expose the Glove80 as a USB-MIDI 1.0 class device alongside the
+      existing HID class. Requires CONFIG_USB_DEVICE_MIDI from the
+      stuffmatic/zephyr-usb-midi module.
+
+config MIDIGLOVES_BLE
+    bool "BLE-MIDI transport"
+    default n
+    help
+      Expose the Glove80 as a BLE-MIDI GATT peripheral alongside the
+      existing HoG service. Requires CONFIG_BLE_MIDI from the
+      stuffmatic/zephyr-ble-midi module.
+
+endif # MIDIGLOVES

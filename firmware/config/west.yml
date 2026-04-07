@@ -1,0 +1,44 @@
+manifest:
+  remotes:
+    - name: darknao
+      url-base: https://github.com/darknao
+    - name: stuffmatic
+      url-base: https://github.com/stuffmatic
+    - name: onnson
+      url-base: https://github.com/Onnson
+
+  projects:
+    # darknao's ZMK fork with per-layer RGB underglow control.
+    # This is the base firmware — we patch it with the small set of hooks
+    # under firmware/zmk-fork-patches/ and consume our module through it.
+    - name: zmk
+      remote: darknao
+      revision: rgb-layer-25.08
+      import: app/west.yml
+
+    # midigloves firmware module (this repo).
+    # For local development, replace this with a west manifest override
+    # pointing at your working copy — see firmware/README.md.
+    - name: midigloves
+      remote: onnson
+      revision: main
+      path: modules/midigloves
+
+    # USB-MIDI 1.0 class driver for Zephyr's legacy USB device stack.
+    # Pulled in when CONFIG_MIDIGLOVES_USB=y. Vetted by a throwaway sample
+    # in firmware/samples/usb_midi_test/ before we wire it into the main
+    # build — see Milestone 1 of the Device 1.0 plan.
+    - name: zephyr-usb-midi
+      remote: stuffmatic
+      revision: main   # TODO: pin a SHA after Milestone 1.1 passes
+      path: modules/lib/zephyr-usb-midi
+
+    # BLE-MIDI GATT service for Zephyr.
+    # Pulled in when CONFIG_MIDIGLOVES_BLE=y. Wired up in Milestone 4.
+    - name: zephyr-ble-midi
+      remote: stuffmatic
+      revision: main   # TODO: pin a SHA after Milestone 4 passes
+      path: modules/lib/zephyr-ble-midi
+
+  self:
+    path: config

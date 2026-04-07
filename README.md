@@ -81,21 +81,34 @@ different instrument or MIDI effect chain.
 
 ```
 midigloves/
-├── README.md                  ← you are here
-├── LICENSE                    ← MIT
-├── .gitignore
-└── prototype/                 ← the working Device 0.5 / 0.8 implementation
-    ├── README.md              ← how the prototype works, how to build it
-    ├── bridge/                ← Python macOS menu-bar bridge (CGEventTap → MIDI)
-    ├── firmware/              ← ZMK config + zmk-patches needed to rebuild
-    ├── uf2/                   ← prebuilt UF2s for left and right halves
-    ├── editor-exports/        ← MoErgo editor JSON / .keymap exports
-    ├── docs/                  ← design notes, RGB scheme, USB-MIDI research
-    └── tools/                 ← color computation, flashing helpers
+├── README.md                    ← you are here
+├── LICENSE                      ← MIT
+├── docs/                        ← public design docs (architecture, MIDI + SysEx specs, build guide)
+├── firmware/                    ← Device 1.0 firmware (scaffolding landed in Milestone 0)
+│   ├── module/                  ← out-of-tree Zephyr module: midigloves
+│   ├── config/                  ← Glove80-specific build config (west.yml, keymap, .conf)
+│   ├── zmk-fork-patches/        ← small unavoidable patches against darknao/zmk
+│   └── samples/usb_midi_test/   ← throwaway USB-MIDI vetting sample
+├── ableton-remote-script/       ← Bridge 3.0 — Live Remote Script for scale crosstalk
+└── prototype/                   ← Device 0.5 → 0.8 archive (frozen reference implementation)
 ```
 
-The Device 1.0 source tree will land at the repository root once the design
-work is complete.
+And the prototype archive breaks down as:
+
+```
+prototype/
+├── README.md              ← archive entry point, how to build the Device 0.8 firmware from source
+├── bridge/                ← Python macOS menu-bar bridge (CGEventTap → MIDI)
+├── firmware/              ← ZMK config + fork patches needed to rebuild the prototype
+├── uf2/                   ← prebuilt UF2s for Device 0.5 and 0.8, both halves
+├── editor-exports/        ← MoErgo Layout Editor JSON / .keymap exports from intermediate iterations
+├── docs/                  ← prototype design notes, RGB scheme research, USB-MIDI research
+└── tools/                 ← color computation, flashing helpers
+```
+
+**Status**: Milestone 0 of Device 1.0 has landed — the directory scaffold and
+design docs are in place. Source files land in Milestones 1–4. The prototype
+remains the working reference until Device 1.0 can replace it.
 
 ## License
 

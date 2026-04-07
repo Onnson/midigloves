@@ -1,0 +1,4 @@
+name: midigloves
+build:
+  cmake: .
+  kconfig: Kconfig
