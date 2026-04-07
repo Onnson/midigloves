@@ -1,0 +1,9 @@
+python-rtmidi>=1.5.0
+
+# Linux only
+evdev>=1.7.0; sys_platform == "linux"
+alsa-midi>=1.0.0; sys_platform == "linux"
+
+# macOS only
+pyobjc-framework-Quartz>=10.0; sys_platform == "darwin"
+pyobjc-framework-IOKit>=10.0; sys_platform == "darwin"

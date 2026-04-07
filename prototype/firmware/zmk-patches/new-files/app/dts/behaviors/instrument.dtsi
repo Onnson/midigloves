@@ -1,0 +1,14 @@
+/*
+ * Copyright (c) 2026 Tal Onn Sella
+ * SPDX-License-Identifier: MIT
+ */
+
+/ {
+    behaviors {
+        inst: inst {
+            compatible = "zmk,behavior-instrument";
+            #binding-cells = <2>;
+            display-name = "Instrument";
+        };
+    };
+};

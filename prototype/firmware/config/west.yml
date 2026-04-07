@@ -1,0 +1,11 @@
+manifest:
+  remotes:
+    - name: darknao
+      url-base: https://github.com/darknao
+  projects:
+    - name: zmk
+      remote: darknao
+      revision: rgb-layer-25.08
+      import: app/west.yml
+  self:
+    path: config

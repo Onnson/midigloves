@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Zephyr / west workspace at the repo root is the developer's local build
+# area — external code, working configs, build artifacts. Never committed.
+# (The committed firmware sources live under prototype/firmware/ for the
+# prototype, and will live at the repo root in their own structure for
+# Device 1.0 once the new layout lands.)
+/firmware/
+build/
+
+# Claude Code session state (per-developer, not project content)
+.claude/
+persistent_context/
+WAKE_UP.md
+wake_up_context.md
+
+# OS / editor
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/

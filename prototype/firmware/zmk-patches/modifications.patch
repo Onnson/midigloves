@@ -1,0 +1,188 @@
+diff --git a/app/CMakeLists.txt b/app/CMakeLists.txt
+index e062c2b6..7bef7bb6 100644
+--- a/app/CMakeLists.txt
++++ b/app/CMakeLists.txt
+@@ -86,6 +86,7 @@ endif()
+ target_sources_ifdef(CONFIG_ZMK_RGB_UNDERGLOW app PRIVATE src/behaviors/behavior_rgb_underglow.c)
+ target_sources_ifdef(CONFIG_ZMK_RGB_UNDERGLOW app PRIVATE src/behaviors/behavior_underglow_color.c)
+ target_sources_ifdef(CONFIG_ZMK_RGB_UNDERGLOW app PRIVATE src/behaviors/behavior_underglow_indicators.c)
++target_sources_ifdef(CONFIG_ZMK_INSTRUMENT_MODE app PRIVATE src/instrument_mode.c src/instrument_rgb.c src/behaviors/behavior_instrument.c)
+ target_sources_ifdef(CONFIG_ZMK_RGB_UNDERGLOW app PRIVATE src/behaviors/behavior_underglow_battery.c)
+ target_sources_ifdef(CONFIG_ZMK_RGB_UNDERGLOW app PRIVATE src/events/underglow_color_changed.c)
+ target_sources_ifdef(CONFIG_ZMK_BACKLIGHT app PRIVATE src/behaviors/behavior_backlight.c)
+diff --git a/app/Kconfig b/app/Kconfig
+index 73042f16..4b3c0640 100644
+--- a/app/Kconfig
++++ b/app/Kconfig
+@@ -349,6 +349,15 @@ config EXPERIMENTAL_RGB_LAYER
+     bool "Experimental per-key per-layer RGB underglow"
+     default n
+ 
++config ZMK_INSTRUMENT_MODE
++    bool "Instrument mode with dynamic chromatic RGB"
++    default n
++
++config ZMK_INSTRUMENT_LAYER
++    int "Layer number for instrument mode"
++    default 3
++    depends on ZMK_INSTRUMENT_MODE
++
+ endif # ZMK_RGB_UNDERGLOW
+ 
+ menuconfig ZMK_BACKLIGHT
+diff --git a/app/dts/behaviors.dtsi b/app/dts/behaviors.dtsi
+index 1f87ef1a..10e8fcf5 100644
+--- a/app/dts/behaviors.dtsi
++++ b/app/dts/behaviors.dtsi
+@@ -31,3 +31,4 @@
+ #include <behaviors/ug_color.dtsi>
+ #include <behaviors/ug_indicators.dtsi>
+ #include <behaviors/ug_battery.dtsi>
++#include <behaviors/instrument.dtsi>
+diff --git a/app/include/zmk/rgb_underglow.h b/app/include/zmk/rgb_underglow.h
+index f00dcd5e..9dfc1053 100644
+--- a/app/include/zmk/rgb_underglow.h
++++ b/app/include/zmk/rgb_underglow.h
+@@ -30,3 +30,4 @@ int zmk_rgb_underglow_change_brt(int direction);
+ int zmk_rgb_underglow_change_spd(int direction);
+ int zmk_rgb_underglow_set_hsb(struct zmk_led_hsb color);
+ int zmk_rgb_underglow_status(void);
++uint8_t zmk_rgb_underglow_get_brightness(void);
+diff --git a/app/src/rgb_underglow.c b/app/src/rgb_underglow.c
+index 9af51dc8..ffb15fb7 100644
+--- a/app/src/rgb_underglow.c
++++ b/app/src/rgb_underglow.c
+@@ -19,6 +19,11 @@
+ #include <zmk/matrix.h>
+ #include <zmk/behavior.h>
+ 
++#if IS_ENABLED(CONFIG_ZMK_INSTRUMENT_MODE)
++#include <zmk/instrument_mode.h>
++#include <zmk/instrument_rgb.h>
++#endif
++
+ #include <zmk/hid_indicators.h>
+ #include <zmk/usb.h>
+ 
+@@ -714,9 +719,9 @@ int zmk_rgb_underglow_toggle(void) {
+ static struct led_rgb hex_to_rgb(uint8_t r, uint8_t g, uint8_t b) {
+     struct zmk_led_hsb hsb = state.color;
+     return (struct led_rgb){
+-        r : (hsb.b * (r)) / 0xff,
+-        g : (hsb.b * (g)) / 0xff,
+-        b : (hsb.b * (b)) / 0xff
++        r : (hsb.b * (r)) / 100,
++        g : (hsb.b * (g)) / 100,
++        b : (hsb.b * (b)) / 100
+     };
+ }
+ 
+@@ -756,11 +761,28 @@ static int zmk_rgb_underglow_apply_rgbmap(const struct zmk_behavior_binding *bin
+     return rc;
+ }
+ 
++uint8_t zmk_rgb_underglow_get_brightness(void) { return state.color.b; }
++
+ static void zmk_rgb_underglow_set_layer(uint8_t layer, bool wakeup) {
+     LOG_DBG("state.layer: %d state.on: %d", state.layer_enabled, state.on);
+     if (!state.layer_enabled)
+         return;
+ 
++#if IS_ENABLED(CONFIG_ZMK_INSTRUMENT_MODE)
++    if (layer == CONFIG_ZMK_INSTRUMENT_LAYER) {
++        instrument_rgb_render(pixels, STRIP_NUM_PIXELS);
++        if (!state.on) {
++            if (!wakeup) {
++                return;
++            }
++            zmk_rgb_underglow_transient_on();
++        }
++        k_timer_stop(&underglow_tick);
++        zmk_led_write_pixels();
++        return;
++    }
++#endif
++
+     const struct zmk_behavior_binding *rgbmap = rgb_underglow_get_bindings(layer);
+     if (rgbmap != NULL && zmk_rgb_underglow_apply_rgbmap(rgbmap, ZMK_KEYMAP_LEN, layer)) {
+         if (!state.on) {
+diff --git a/app/src/split/bluetooth/central.c b/app/src/split/bluetooth/central.c
+index a1fdf885..a347488a 100644
+--- a/app/src/split/bluetooth/central.c
++++ b/app/src/split/bluetooth/central.c
+@@ -35,6 +35,10 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+ #include <zmk/physical_layouts.h>
+ #include <zmk/events/split_peripheral_layer_changed.h>
+ 
++#if IS_ENABLED(CONFIG_ZMK_INSTRUMENT_MODE)
++#include <zmk/instrument_mode.h>
++#endif
++
+ static int start_scanning(void);
+ 
+ #define POSITION_STATE_DATA_LEN 16
+@@ -1185,6 +1189,11 @@ static void split_central_update_layers_callback(struct k_work *work) {
+ static K_WORK_DEFINE(split_central_update_layers, split_central_update_layers_callback);
+ 
+ int zmk_split_central_update_layers(uint32_t new_layers) {
++#if IS_ENABLED(CONFIG_ZMK_INSTRUMENT_MODE)
++    /* Encode instrument state in upper 16 bits of the layer bitmask */
++    uint16_t inst_state = instrument_mode_encode_state();
++    new_layers = (new_layers & 0xFFFF) | ((uint32_t)inst_state << 16);
++#endif
+     layers_for_peripheral = new_layers;
+     return k_work_submit_to_queue(&split_central_split_run_q, &split_central_update_layers);
+ }
+diff --git a/app/src/split/bluetooth/service.c b/app/src/split/bluetooth/service.c
+index 9f02a4ca..b6b1943e 100644
+--- a/app/src/split/bluetooth/service.c
++++ b/app/src/split/bluetooth/service.c
+@@ -37,6 +37,10 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+ #include <zmk/sensors.h>
+ #include <zmk/events/split_peripheral_layer_changed.h>
+ 
++#if IS_ENABLED(CONFIG_ZMK_INSTRUMENT_MODE)
++#include <zmk/instrument_mode.h>
++#endif
++
+ #if ZMK_KEYMAP_HAS_SENSORS
+ static struct sensor_event last_sensor_event;
+ 
+@@ -142,12 +146,24 @@ static ssize_t split_svc_get_selected_phys_layout(struct bt_conn *conn,
+ }
+ 
+ static uint32_t layers = 0;
++/* Mutex protecting `layers` between BLE RX write context and the work
++ * queue reader. A partial memcpy + concurrent read would tear the uint32. */
++static K_MUTEX_DEFINE(layers_mutex);
+ 
+ static void split_svc_update_layers_callback(struct k_work *work) {
+-    LOG_DBG("Setting peripheral layers: %x", layers);
+-    // set_peripheral_layers_state(layers);
++    uint32_t snapshot;
++    k_mutex_lock(&layers_mutex, K_FOREVER);
++    snapshot = layers;
++    k_mutex_unlock(&layers_mutex);
++
++    LOG_DBG("Setting peripheral layers: %x", snapshot);
++#if IS_ENABLED(CONFIG_ZMK_INSTRUMENT_MODE)
++    /* Extract instrument state from upper 16 bits */
++    instrument_mode_decode_state((uint16_t)(snapshot >> 16));
++#endif
++    /* Pass only the lower 16 bits as layer bitmask */
+     raise_zmk_split_peripheral_layer_changed(
+-        (struct zmk_split_peripheral_layer_changed){.layers = layers});
++        (struct zmk_split_peripheral_layer_changed){.layers = snapshot & 0xFFFF});
+ }
+ 
+ static K_WORK_DEFINE(split_svc_update_layers_work, split_svc_update_layers_callback);
+@@ -159,7 +175,9 @@ static ssize_t split_svc_update_layers(struct bt_conn *conn, const struct bt_gat
+         return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+     }
+ 
++    k_mutex_lock(&layers_mutex, K_FOREVER);
+     memcpy((uint8_t *)&layers + offset, buf, len);
++    k_mutex_unlock(&layers_mutex);
+ 
+     k_work_submit(&split_svc_update_layers_work);
+ 

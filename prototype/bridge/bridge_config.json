@@ -1,0 +1,17 @@
+{
+  "base_note": 36,
+  "col_interval": 2,
+  "row_interval": 1,
+  "thumb_base": 24,
+  "thumb_col_interval": 2,
+  "thumb_row_interval": 1,
+  "include_thumbs": true,
+  "include_r6": false,
+  "scale": "chromatic",
+  "root": 0,
+  "channel": 0,
+  "velocity": 100,
+  "octave_offset": 0,
+  "octave_offset_min": -4,
+  "octave_offset_max": 4
+}

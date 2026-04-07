@@ -1,0 +1,5 @@
+description: Instrument mode command behavior
+
+compatible: "zmk,behavior-instrument"
+
+include: two_param.yaml
