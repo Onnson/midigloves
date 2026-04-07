@@ -368,6 +368,34 @@ def build_note_map(lh_base=36, rh_base=60, col_interval=2, row_interval=1,
     return note_map
 
 
+def notational_iso_anchor_pitch(anchor_row, anchor_col, side='lh',
+                                 lh_base=36, rh_base=60):
+    """Return the pure-chromatic iso pitch at a grid position.
+
+    Unlike build_note_map (which uses the irregular per-column 2oct
+    offsets C D E G A B / C# D# F F# G# A#), this returns a strictly
+    isomorphic pitch where moving one row up adds one semitone and
+    moving one col right adds two semitones. This is the correct
+    baseline for seeding iso mode — using note_map[anchor_key] as the
+    seed instead would fold in either the 2oct table's irregular jumps
+    or (worse) an iso ±12 octave-resolution shift from a previous
+    iso session, causing cascading drift on re-anchor.
+
+    Args:
+        anchor_row, anchor_col: grid position of the anchor
+        side: 'lh' or 'rh' — determines base pitch and local col
+        lh_base, rh_base: hand base pitches (MIDI numbers); defaults
+            match build_note_map's C2 / C4 convention
+
+    Returns:
+        MIDI pitch (int) at the anchor position under pure iso math.
+        Does NOT include any zone octave offset — the caller adds that.
+    """
+    base = lh_base if side == 'lh' else rh_base
+    local_col = anchor_col if side == 'lh' else anchor_col - 6
+    return base + anchor_row + local_col * 2
+
+
 def build_isomorphic_from_anchor(anchor_row, anchor_col, anchor_pitch,
                                   col_interval=2, row_interval=1, side='lh'):
     """Build isomorphic note map for one half, anchored at a specific position.

@@ -48,6 +48,7 @@ from physical_layout import (
     KEY_MODE_TOGGLE_RH,
     build_note_map,
     build_isomorphic_from_anchor,
+    notational_iso_anchor_pitch,
     note_name,
     NOTE_NAMES as PITCH_NAMES,
 )
@@ -731,7 +732,10 @@ class Glove80TrayApp(rumps.App):
 
         for zi in target_zones:
             if zones_with_notes and zi in zones_with_notes:
-                # Notes playing — switch to isomorphic anchored on last released note
+                # Notes playing — switch to isomorphic anchored on last PRESSED
+                # grid key in this zone. Fallback to scanning active held keys
+                # if _last_note_released is somehow unset (shouldn't happen —
+                # it's updated on press).
                 anchor = self._last_note_released[zi]
                 if anchor is None:
                     for kc in range(256):
@@ -739,15 +743,21 @@ class Glove80TrayApp(rumps.App):
                             continue
                         if key_zones.get(kc) == zi and kc in GRID_POSITION:
                             pos = GRID_POSITION[kc]
-                            # Use base_midi (before octave offset) to avoid double-shift
-                            lk = self._fast_lookup[kc]
-                            if lk is not None:
-                                anchor = (kc, lk[0], pos[0], pos[1])
-                                break
+                            anchor = (kc, None, pos[0], pos[1])
+                            break
                 if anchor:
-                    _, pitch, row, col = anchor[:4]
+                    _, _, row, col = anchor[:4]
                     side = 'lh' if zi == 0 else 'rh'
-                    iso_map = build_isomorphic_from_anchor(row, col, pitch, side=side)
+                    # Compute anchor_pitch NOTATIONALLY from (row, col), not
+                    # from note_map / _last_note_released[...][1]. The stored
+                    # value can be either a 2oct pitch (irregular C D E G A B
+                    # intervals) or an iso ±12 octave-extension pitch, either
+                    # of which corrupts the seed for re-anchoring. Pure chromatic
+                    # (row + col*2 from the hand base) is the only seed that's
+                    # stable across mode toggles and re-anchors.
+                    anchor_pitch = notational_iso_anchor_pitch(row, col, side=side)
+                    anchor_pitch += self._zone_octaves[zi] * 12
+                    iso_map = build_isomorphic_from_anchor(row, col, anchor_pitch, side=side)
                     for kc, note in iso_map.items():
                         self.note_map[kc] = note
                     self._grid_mode[zi] = 'isomorphic'
