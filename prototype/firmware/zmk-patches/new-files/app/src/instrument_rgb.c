@@ -119,6 +119,24 @@ uint8_t instrument_pos_zone(uint8_t pos) {
 uint8_t instrument_pos_hand(uint8_t pos) {
     return (pos < 80) ? pos_table[pos].hand : 0;
 }
+uint8_t instrument_pos_col(uint8_t pos) {
+    return (pos < 80) ? pos_table[pos].col : 0;
+}
+
+/* Forward-declare the per-col semitone tables (defined below) so the
+ * accessor above can reference them. Non-static linkage so the render
+ * path and the iso anchor K computation share one source of truth. */
+extern const uint8_t TWO_OCT_LOWER_OFFSETS[6];
+extern const uint8_t TWO_OCT_UPPER_OFFSETS[6];
+
+/* Return the raw 2oct note class (0-11) for a given grid (row, col) without
+ * applying semi_offset. Used by both the render path and instrument_mode's
+ * iso anchor K computation. */
+int instrument_note_class_2oct_raw(uint8_t row, uint8_t col) {
+    if (col >= 6) return 0;
+    return (row % 2) ? TWO_OCT_UPPER_OFFSETS[col]
+                     : TWO_OCT_LOWER_OFFSETS[col];
+}
 
 /* Base note classes for bass keys (at offset 0):
  * LH: pos 66=A0(9), 67=A#0(10), 68=B0(11)
@@ -143,8 +161,8 @@ static const int8_t bass_idx_table[80] = {
  *   lower (row%2==0) col 0..5 → C  D  E  G  A  B   (0 2 4 7 9 11)
  *   upper (row%2==1) col 0..5 → C# D# F  F# G# A#  (1 3 5 6 8 10)
  * All 12 chromatic notes per block, no duplicates. */
-static const uint8_t TWO_OCT_LOWER_OFFSETS[6] = {0, 2, 4, 7, 9, 11};
-static const uint8_t TWO_OCT_UPPER_OFFSETS[6] = {1, 3, 5, 6, 8, 10};
+const uint8_t TWO_OCT_LOWER_OFFSETS[6] = {0, 2, 4, 7, 9, 11};
+const uint8_t TWO_OCT_UPPER_OFFSETS[6] = {1, 3, 5, 6, 8, 10};
 
 static int note_class_for_grid(const struct pos_info *p,
                                const struct instrument_hand_state *st) {

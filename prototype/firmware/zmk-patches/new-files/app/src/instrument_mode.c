@@ -31,8 +31,10 @@ zmk_keymap_layers_state_t zmk_keymap_layer_state(void);
 
 /* Import pos_table accessors from instrument_rgb.c */
 uint8_t instrument_pos_row(uint8_t pos);
+uint8_t instrument_pos_col(uint8_t pos);
 uint8_t instrument_pos_zone(uint8_t pos);
 uint8_t instrument_pos_hand(uint8_t pos);
+int instrument_note_class_2oct_raw(uint8_t row, uint8_t col);
 void instrument_rgb_invalidate_cache(void);
 
 static struct instrument_hand_state hand_state[2] = {
@@ -71,14 +73,27 @@ static uint8_t held_grid_count[2] = {0, 0};
  * semi_offset is applied separately in the render formula.
  * ═══════════════════════════════════════════════════════════════════ */
 
+/* Compute the iso anchor offset K so that at the anchor position the iso
+ * formula (K + row + col*2 + semi) mod 12 matches the 2oct note class
+ * (per-col lookup + row_in_block + semi) mod 12. Because semi_offset cancels
+ * on both sides, we only need to solve:
+ *   K + anchor_row + anchor_col*2  ≡  TWO_OCT[anchor_row%2][anchor_col]  (mod 12)
+ * so K = (TWO_OCT_class - anchor_row - anchor_col*2) mod 12.
+ *
+ * Under the OLD strict-isomorphic 2oct layout (col*2 + row_in_block), K was
+ * only ever 0 or 10 depending on the anchor row. The new per-col table
+ * layout (C D E G A B / C# D# F F# G# A#) makes K depend on col as well,
+ * with K ∈ {0, 1, 9, 10, 11} across the 24 grid positions. */
 static int8_t compute_iso_anchor_k(uint8_t pos) {
     uint8_t zone = instrument_pos_zone(pos);
     if (zone != ZONE_GRID) {
         return 0; /* non-grid anchor: no geometric correction */
     }
     uint8_t row = instrument_pos_row(pos);
-    int8_t row_correction = (row >= 2) ? -2 : 0;
-    return ((row_correction % 12) + 12) % 12; /* 0 for rows 0-1, 10 for rows 2-3 */
+    uint8_t col = instrument_pos_col(pos);
+    int anchor_class = instrument_note_class_2oct_raw(row, col);
+    int iso_linear = row + col * 2;
+    return (int8_t)(((anchor_class - iso_linear) % 12 + 12) % 12);
 }
 
 /* ═══════════════════════════════════════════════════════════════════ */
@@ -192,8 +207,28 @@ void instrument_mode_decode_state(uint16_t enc) {
     hand_state[1].mode = (enc >> 9) & 1;
     bass_semi_offset = (int8_t)((enc >> 10) & 0xF);
     if (bass_semi_offset > 11) bass_semi_offset = 0;
-    hand_state[0].iso_anchor_offset = ((enc >> 14) & 1) ? 10 : 0;
-    hand_state[1].iso_anchor_offset = ((enc >> 15) & 1) ? 10 : 0;
+
+    /* The 1-bit iso_anchor_offset fields in the split encoding (bits 14/15)
+     * are lossy under the new per-col 2oct layout — the correct K can be
+     * 0, 1, 9, 10, or 11 depending on the anchor's (row, col), not just
+     * {0, 10}. Ignore the encoded value and recompute K locally from our
+     * own last_note_pos for any hand in iso mode. This works because:
+     *   - The peripheral tracks its own RH last_note_pos from its local
+     *     matrix scan (events get raised locally before being forwarded).
+     *   - LH K on peripheral is irrelevant (peripheral only renders RH).
+     *   - Central computes K correctly in apply_command and never calls
+     *     decode_state on itself, so this path only executes on peripheral.
+     */
+    (void)((enc >> 14) & 1); /* bit 14 ignored — see above */
+    (void)((enc >> 15) & 1); /* bit 15 ignored — see above */
+    for (int h = 0; h < 2; h++) {
+        if (hand_state[h].mode == 1) {
+            hand_state[h].iso_anchor_offset =
+                compute_iso_anchor_k(last_note_pos[h]);
+        } else {
+            hand_state[h].iso_anchor_offset = 0;
+        }
+    }
     k_mutex_unlock(&inst_state_mutex);
 
     /* Invalidate color cache so the next render recomputes with new state */

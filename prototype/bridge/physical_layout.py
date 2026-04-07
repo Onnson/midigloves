@@ -398,7 +398,11 @@ def build_isomorphic_from_anchor(anchor_row, anchor_col, anchor_pitch,
     # Octave extension: with the iso formula on a 4x6 grid we get 24 positions
     # but only ~14 distinct pitches — many pairs collide. For each duplicate
     # pair, the physically closer one to the anchor keeps the anchor octave;
-    # the farther one gets +12 (next octave up). Effective range: 2 octaves.
+    # the farther one is shifted by ±12 depending on its physical row relative
+    # to the anchor: above the anchor (higher row = farther from user) → +12,
+    # below the anchor (lower row = closer to user) → -12. This puts the
+    # anchor in the middle of the two-octave range and keeps the "up = higher
+    # pitch / down = lower pitch" geometry intact.
     from collections import defaultdict
     by_pitch = defaultdict(list)
     for kc, r, c, p in entries:
@@ -411,13 +415,21 @@ def build_isomorphic_from_anchor(anchor_row, anchor_col, anchor_pitch,
             if 0 <= pitch <= 127:
                 note_map[kc] = pitch
         else:
-            # Sort by Manhattan distance from anchor ascending:
-            # closer → anchor octave, farther → +12
+            # Sort by Manhattan distance from anchor ascending: closer keeps
+            # the anchor octave, farther gets shifted by ±12 based on its
+            # physical row relative to the anchor (see comment above).
             def dist(g):
                 return abs(g[1] - anchor_row) + abs(g[2] - anchor_col)
             sorted_group = sorted(group, key=dist)
             for i, (kc, r, c) in enumerate(sorted_group):
-                final_pitch = pitch if i == 0 else pitch + 12
+                if i == 0:
+                    final_pitch = pitch
+                elif r > anchor_row:
+                    final_pitch = pitch + 12   # farther duplicate is above anchor
+                elif r < anchor_row:
+                    final_pitch = pitch - 12   # farther duplicate is below anchor
+                else:
+                    final_pitch = pitch + 12   # same row fallback (unreached in 4x6)
                 if 0 <= final_pitch <= 127:
                     note_map[kc] = final_pitch
     return note_map
